@@ -81,7 +81,7 @@ project2/
 ├── docker-compose.yml
 ├── package.json             # backend dependencies
 └── README.md
-
+```
 
 # 🚀 How to Run ChatSphere
 
