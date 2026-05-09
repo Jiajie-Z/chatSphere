@@ -1,13 +1,14 @@
-# 💬 ChatSphere
+# ChatSphere
 
 ![React](https://img.shields.io/badge/Frontend-React-blue)
 ![Node](https://img.shields.io/badge/Backend-Node.js-green)
 ![MySQL](https://img.shields.io/badge/Database-MySQL-orange)
 ![Docker](https://img.shields.io/badge/DevOps-Docker-blue)
+![CI](https://img.shields.io/badge/CI-GitHub%20Actions-black)
 
 A full-stack real-time chat application with persistent storage and real-time messaging.
 
-## 🧠 Overview
+## Overview
 
 ChatSphere is a real-time chat system that supports:
 
@@ -40,6 +41,7 @@ ChatSphere is a real-time chat system that supports:
 ### DevOps / Tooling
 - Docker
 - Docker Compose
+- GitHub Actions
 
 ---
 
@@ -57,10 +59,45 @@ ChatSphere is a real-time chat system that supports:
 
 ---
 
+## Architecture
+
+```mermaid
+flowchart LR
+  Browser["React client"] -->|"REST API"| Server["Express server"]
+  Browser <-->|"Socket.IO"| Server
+  Server -->|"mysql2 connection pool"| Database["MySQL"]
+  Server -->|"bcrypt"| Auth["Password hashing"]
+```
+
+ChatSphere uses REST endpoints for authentication, session checks, initial message loading, and user loading. Socket.IO handles live chat events after a user has joined the chat. Messages are persisted in MySQL, while the online user list is derived from active socket connections.
+
+## API Overview
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| `GET` | `/api/session` | Check whether the current browser has a valid session |
+| `POST` | `/api/auth/register` | Create a user, hash the password, and start a session |
+| `POST` | `/api/auth/login` | Verify credentials and start a session |
+| `DELETE` | `/api/session` | Clear the session cookie and delete the stored session |
+| `GET` | `/api/messages` | Load persisted chat messages for an authenticated user |
+| `GET` | `/api/users` | Load currently connected chat users |
+
+## Real-Time Events
+
+| Event | Direction | Purpose |
+|-------|-----------|---------|
+| `join-chat` | Client to server | Associate a socket connection with the logged-in user |
+| `send-message` | Client to server | Persist a message from the connected user |
+| `messages-updated` | Server to clients | Broadcast the latest message list |
+| `users-updated` | Server to clients | Broadcast the active user list |
+| `chat-error` | Server to client | Report message or server errors |
+
+---
+
 ## Project Structure
 
 ```bash
-project2/
+chatSphere/
 ├── client/                  # React + Vite frontend
 │   ├── src/
 │   │   ├── api/
@@ -73,23 +110,29 @@ project2/
 │   └── vite.config.js
 ├── sql/
 │   └── schema.sql           # MySQL schema
-├── chats.js                 # chat/user DB logic
-├── db.js                    # MySQL connection with retry
-├── server.js                # Express + Socket.IO server
-├── sessions.js              # session DB logic
+├── server/                  # Express + Socket.IO backend
+│   ├── index.js             # API routes, socket events, and server startup
+│   ├── chats.js             # chat/user DB logic
+│   ├── db.js                # MySQL connection with retry
+│   ├── sessions.js          # session DB logic
+│   └── tests/
+│       └── validation.test.js
+├── .github/
+│   └── workflows/
+│       └── ci.yml           # GitHub Actions CI workflow
 ├── Dockerfile               # backend Dockerfile
 ├── docker-compose.yml
 ├── package.json             # backend dependencies
 └── README.md
 ```
 
-# 🚀 How to Run ChatSphere
+# How to Run ChatSphere
 
 This guide explains how to run the ChatSphere application using either Docker (recommended) or local development setup.
 
 ---
 
-## 🐳 Option 1: Run with Docker (Recommended)
+## Option 1: Run with Docker (Recommended)
 
 ### Prerequisites
 
@@ -127,7 +170,7 @@ docker compose down
 
 
 
-## 💻 Option 2: Run Locally (Without Docker)
+## Option 2: Run Locally (Without Docker)
 
 ---
 
@@ -192,7 +235,7 @@ npm run dev
 
 ---
 
-## ⚠️ Common Issues
+## Common Issues
 
 ---
 
@@ -224,9 +267,11 @@ If you see port conflicts:
 
 ---
 
-## 🧠 Notes
+## Notes
 
 - Docker uses service names for networking (`DB_HOST=db`)
+- The Vite proxy targets `http://localhost:3000` by default for local development
+- Docker overrides the Vite proxy with `VITE_API_PROXY_TARGET=http://server:3000`
 - `.env` is used only in local mode
 - Docker uses `environment` in compose instead
 

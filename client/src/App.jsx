@@ -138,7 +138,7 @@ export default function App() {
 
     setError('');
 
-    sendSocketMessage(username, text).catch((err) => {
+    sendSocketMessage(text).catch((err) => {
       setError(mapError(err, 'Failed to send message.'));
     });
   }
