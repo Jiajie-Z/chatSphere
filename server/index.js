@@ -19,13 +19,17 @@ const io = new Server(server);
 
 const onlineSockets = new Map();
 
+function getOnlineUsers() {
+  const sortedUsers = [...new Set(onlineSockets.values())].sort();
+
+  return sortedUsers.reduce((users, username) => {
+    users[username] = username;
+    return users;
+  }, {});
+}
+
 async function broadcastUsers() {
-  try {
-    const usersList = await sessions.getLoggedInUsers();
-    io.emit('users-updated', usersList);
-  } catch (err) {
-    console.error('Failed to broadcast users:', err);
-  }
+  io.emit('users-updated', getOnlineUsers());
 }
 
 async function broadcastMessages() {
@@ -47,8 +51,10 @@ io.on('connection', (socket) => {
     await broadcastUsers();
   });
 
-  socket.on('send-message', async ({ username, text }) => {
+  socket.on('send-message', async ({ text }) => {
     try {
+      const username = onlineSockets.get(socket.id);
+
       if (!username || !text || !text.trim()) {
         socket.emit('chat-error', { error: 'required-message' });
         return;
@@ -196,7 +202,7 @@ app.get('/api/users', async (req, res) => {
   }
 
   try {
-    const usersList = await sessions.getLoggedInUsers();
+    const usersList = getOnlineUsers();
     res.json({ username, usersList });
   } catch (err) {
     console.error('USERS ERROR:', err);

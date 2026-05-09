@@ -27,11 +27,11 @@ export function disconnectSocket() {
   }
 }
 
-export function sendSocketMessage(username, text) {
+export function sendSocketMessage(text) {
   if (!socket) {
     return Promise.reject({ error: 'network-error' });
   }
 
-  socket.emit('send-message', { username, text });
+  socket.emit('send-message', { text });
   return Promise.resolve();
 }
