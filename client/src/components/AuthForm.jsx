@@ -18,7 +18,11 @@ export default function AuthForm({ mode, error, onLogin, onRegister, onSwitchMod
 
   return (
     <div id="login">
-      <h1>{mode === 'login' ? 'Chatting Room' : 'Register'}</h1>
+      <div className="auth-header">
+        <p className="app-name">ChatSphere</p>
+        <h1>{mode === 'login' ? 'Welcome back' : 'Create your account'}</h1>
+        <p className="auth-subtitle">Real-time conversations with persistent history.</p>
+      </div>
 
       {error ? <p className="form-error">{error}</p> : null}
 

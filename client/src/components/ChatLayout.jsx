@@ -13,7 +13,10 @@ export default function ChatLayout({
   return (
     <div id="chat">
       <div id="welcome">
-        <p>Hello, {username}!</p>
+        <div>
+          <p className="app-name">ChatSphere</p>
+          <p className="welcome__user">Signed in as {username}</p>
+        </div>
         <div id="logout">
           <button className="logout__button" type="button" onClick={onLogout}>
             Logout
@@ -25,11 +28,12 @@ export default function ChatLayout({
 
       <div id="main">
         <div id="users">
+          <h2 className="panel-title">Online</h2>
           <UserList users={users} currentUser={username} />
         </div>
 
         <div id="messages">
-          <MessageList messages={messages} />
+          <MessageList messages={messages} currentUser={username} />
         </div>
       </div>
 
