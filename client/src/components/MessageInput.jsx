@@ -2,15 +2,17 @@ import { useState } from 'react';
 
 export default function MessageInput({ onSendMessage }) {
   const [text, setText] = useState('');
+  const canSend = text.trim().length > 0;
 
   function handleSubmit(e) {
     e.preventDefault();
 
-    onSendMessage(text);
-
-    if (text.trim()) {
-      setText('');
+    if (!canSend) {
+      return;
     }
+
+    onSendMessage(text);
+    setText('');
   }
 
   return (
@@ -27,7 +29,7 @@ export default function MessageInput({ onSendMessage }) {
         value={text}
         onChange={(e) => setText(e.target.value)}
       />
-      <button className="send__button" type="submit">
+      <button className="send__button" type="submit" disabled={!canSend}>
         Send
       </button>
     </form>
