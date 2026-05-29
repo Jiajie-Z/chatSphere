@@ -1,15 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import AuthForm from './components/AuthForm';
 import ChatLayout from './components/ChatLayout';
 import { fetchSession, fetchLogin, fetchRegister, fetchLogout } from './api/auth';
-import { fetchMessages, fetchUsers } from './api/chat';
+import { fetchChannels, fetchMessages, fetchUsers } from './api/chat';
 import { connectSocket, disconnectSocket, sendSocketMessage } from './api/socket';
-import type { ApiError, AuthMode, Message, PendingMessage, UserMap } from './types';
+import type { ApiError, AuthMode, Channel, Message, PendingMessage, UserMap } from './types';
 
+const DEFAULT_CHANNEL_ID = 'general';
 const MESSAGE_PAGE_SIZE = 50;
 
 export default function App() {
   const [username, setUsername] = useState('');
+  const [channels, setChannels] = useState<Channel[]>([]);
+  const [activeChannel, setActiveChannel] = useState(DEFAULT_CHANNEL_ID);
   const [messages, setMessages] = useState<Message[]>([]);
   const [pendingMessages, setPendingMessages] = useState<PendingMessage[]>([]);
   const [users, setUsers] = useState<UserMap>({});
@@ -53,13 +56,14 @@ export default function App() {
     return fallback;
   }
 
-  function loadInitialChatData() {
-    return Promise.all([fetchMessages(), fetchUsers()]).then(([msgRes, userRes]) => {
+  const loadInitialChatData = useCallback((channel: string) => {
+    return Promise.all([fetchChannels(), fetchMessages({ channel }), fetchUsers(channel)]).then(([channelsRes, msgRes, userRes]) => {
+      setChannels(channelsRes.channels || []);
       setMessages(msgRes.messagesList || []);
       setHasMoreMessages(!!msgRes.hasMore);
       setUsers(userRes.usersList || {});
     });
-  }
+  }, []);
 
   function mergeMessages(currentMessages: Message[], olderMessages: Message[]) {
     const seenIds = new Set(currentMessages.map((message) => message.id));
@@ -72,7 +76,7 @@ export default function App() {
     fetchSession()
       .then((res) => {
         setUsername(res.username);
-        return loadInitialChatData();
+        return loadInitialChatData(DEFAULT_CHANNEL_ID);
       })
       .catch((err: ApiError) => {
         if (err?.error !== 'auth-missing') {
@@ -82,7 +86,7 @@ export default function App() {
       .finally(() => {
         setLoading(false);
       });
-  }, []);
+  }, [loadInitialChatData]);
 
   useEffect(() => {
     if (!username) {
@@ -90,6 +94,7 @@ export default function App() {
     }
 
     connectSocket(
+      activeChannel,
       (messagesList) => {
         setMessages(messagesList || []);
         setPendingMessages((currentPendingMessages) => (
@@ -108,7 +113,7 @@ export default function App() {
     return () => {
       disconnectSocket();
     };
-  }, [username]);
+  }, [username, activeChannel]);
 
   function handleLogin(inputUsername: string, password: string) {
     setError('');
@@ -117,7 +122,7 @@ export default function App() {
       .then((res) => {
         setUsername(res.username);
         setAuthMode('login');
-        return loadInitialChatData();
+        return loadInitialChatData(activeChannel);
       })
       .catch((err: ApiError) => {
         setError(mapError(err, 'Login failed. Please try again.'));
@@ -131,7 +136,7 @@ export default function App() {
       .then((res) => {
         setUsername(res.username);
         setAuthMode('login');
-        return loadInitialChatData();
+        return loadInitialChatData(activeChannel);
       })
       .catch((err: ApiError) => {
         setError(mapError(err, 'Registration failed. Please try again.'));
@@ -143,6 +148,7 @@ export default function App() {
       .then(() => {
         disconnectSocket();
         setUsername('');
+        setActiveChannel(DEFAULT_CHANNEL_ID);
         setMessages([]);
         setPendingMessages([]);
         setUsers({});
@@ -191,6 +197,23 @@ export default function App() {
       });
   }
 
+  function handleChannelChange(channel: string) {
+    if (channel === activeChannel) {
+      return;
+    }
+
+    setActiveChannel(channel);
+    setMessages([]);
+    setPendingMessages([]);
+    setUsers({});
+    setHasMoreMessages(false);
+    setLoadingOlderMessages(false);
+    setError('');
+    loadInitialChatData(channel).catch((err: ApiError) => {
+      setError(mapError(err, 'Failed to load channel.'));
+    });
+  }
+
   function handleRetryMessage(clientId: string) {
     const pendingMessage = pendingMessages.find((message) => message.clientId === clientId);
 
@@ -235,7 +258,7 @@ export default function App() {
     setLoadingOlderMessages(true);
     setError('');
 
-    fetchMessages({ before: oldestMessageId, limit: MESSAGE_PAGE_SIZE })
+    fetchMessages({ before: oldestMessageId, channel: activeChannel, limit: MESSAGE_PAGE_SIZE })
       .then((res) => {
         setMessages((currentMessages) => mergeMessages(currentMessages, res.messagesList || []));
         setHasMoreMessages(!!res.hasMore);
@@ -271,12 +294,15 @@ export default function App() {
   return (
     <ChatLayout
       username={username}
+      activeChannel={activeChannel}
+      channels={channels}
       messages={messages}
       pendingMessages={pendingMessages}
       users={users}
       hasMoreMessages={hasMoreMessages}
       loadingOlderMessages={loadingOlderMessages}
       error={error}
+      onChannelChange={handleChannelChange}
       onLogout={handleLogout}
       onLoadOlderMessages={handleLoadOlderMessages}
       onRetryMessage={handleRetryMessage}

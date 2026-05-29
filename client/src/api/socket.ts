@@ -4,6 +4,7 @@ import type { ApiError, Message, UserMap } from '../types';
 let socket: Socket | null = null;
 
 export function connectSocket(
+  channel: string,
   onMessagesUpdated: (messages: Message[]) => void,
   onUsersUpdated: (users: UserMap) => void,
   onError: (error: ApiError) => void
@@ -19,9 +20,34 @@ export function connectSocket(
   socket.on('messages-updated', onMessagesUpdated);
   socket.on('users-updated', onUsersUpdated);
   socket.on('chat-error', onError);
+  socket.on('connect', () => {
+    joinSocketChannel(channel).catch(onError);
+  });
   socket.on('connect_error', (err) => {
     const errorCode = err.message === 'auth-missing' ? 'auth-missing' : 'server-error';
     onError({ error: errorCode });
+  });
+}
+
+export function joinSocketChannel(channel: string): Promise<void> {
+  if (!socket) {
+    return Promise.reject({ error: 'network-error' } satisfies ApiError);
+  }
+
+  return new Promise((resolve, reject) => {
+    socket?.timeout(5000).emit('join-channel', { channel }, (err: Error | null, response?: { ok: boolean; error?: ApiError['error'] }) => {
+      if (err) {
+        reject({ error: 'network-error' } satisfies ApiError);
+        return;
+      }
+
+      if (!response?.ok) {
+        reject({ error: response?.error || 'server-error' } satisfies ApiError);
+        return;
+      }
+
+      resolve();
+    });
   });
 }
 

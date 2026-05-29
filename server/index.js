@@ -42,8 +42,12 @@ function createApp({
   app.use(express.static('./public'));
   app.use(express.json());
 
-  async function getOnlineUsers(io) {
-    const sockets = await io.fetchSockets();
+  function getChannelRoom(channel) {
+    return `channel:${chats.normalizeChannel(channel)}`;
+  }
+
+  async function getChannelUsers(io, channel) {
+    const sockets = await io.in(getChannelRoom(channel)).fetchSockets();
     const sortedUsers = [
       ...new Set(
         sockets
@@ -58,14 +62,15 @@ function createApp({
     }, {});
   }
 
-  async function broadcastUsers(io) {
-    io.emit('users-updated', await getOnlineUsers(io));
+  async function broadcastUsers(io, channel) {
+    io.to(getChannelRoom(channel)).emit('users-updated', await getChannelUsers(io, channel));
   }
 
-  async function broadcastMessages(io) {
+  async function broadcastMessages(io, channel) {
     try {
-      const { messagesList } = await chats.getMessages();
-      io.emit('messages-updated', messagesList);
+      const normalizedChannel = chats.normalizeChannel(channel);
+      const { messagesList } = await chats.getMessages({ channel: normalizedChannel });
+      io.to(getChannelRoom(normalizedChannel)).emit('messages-updated', messagesList);
     } catch (err) {
       console.error('Failed to broadcast messages:', err);
     }
@@ -79,6 +84,10 @@ function createApp({
   app.get('/api/session', requireAuth, async (req, res) => {
     const { username } = req.session;
     res.json({ username });
+  });
+
+  app.get('/api/channels', requireAuth, async (req, res) => {
+    res.json({ channels: chats.CHANNELS });
   });
 
   app.post('/api/auth/register', authRateLimiter, async (req, res) => {
@@ -166,11 +175,16 @@ function createApp({
 
   app.get('/api/messages', requireAuth, async (req, res) => {
     const { username } = req.session;
-    const { before, limit } = req.query;
+    const { before, channel, limit } = req.query;
+    const normalizedChannel = chats.normalizeChannel(channel);
 
     try {
-      const { hasMore, messagesList } = await chats.getMessages({ before, limit });
-      res.json({ username, messagesList, hasMore });
+      const { hasMore, messagesList } = await chats.getMessages({
+        before,
+        channel: normalizedChannel,
+        limit,
+      });
+      res.json({ username, channel: normalizedChannel, messagesList, hasMore });
     } catch (err) {
       console.error('MESSAGES ERROR:', err);
       res.status(500).json({ error: 'server-error' });
@@ -179,12 +193,13 @@ function createApp({
 
   app.get('/api/users', requireAuth, async (req, res) => {
     const { username } = req.session;
+    const channel = chats.normalizeChannel(req.query.channel);
 
     try {
       const usersList = req.app.locals.io
-        ? await getOnlineUsers(req.app.locals.io)
+        ? await getChannelUsers(req.app.locals.io, channel)
         : {};
-      res.json({ username, usersList });
+      res.json({ username, channel, usersList });
     } catch (err) {
       console.error('USERS ERROR:', err);
       res.status(500).json({ error: 'server-error' });
@@ -215,11 +230,43 @@ function createApp({
     });
 
     io.on('connection', async (socket) => {
-      await broadcastUsers(io);
+      async function joinChannel(channel) {
+        const nextChannel = chats.normalizeChannel(channel);
+        const previousChannel = socket.data.channel;
+
+        if (previousChannel) {
+          socket.leave(getChannelRoom(previousChannel));
+        }
+
+        socket.data.channel = nextChannel;
+        socket.join(getChannelRoom(nextChannel));
+
+        if (previousChannel && previousChannel !== nextChannel) {
+          await broadcastUsers(io, previousChannel);
+        }
+
+        await broadcastUsers(io, nextChannel);
+      }
+
+      await joinChannel(chats.DEFAULT_CHANNEL_ID);
+
+      socket.on('join-channel', async ({ channel }, ack) => {
+        try {
+          await joinChannel(channel);
+          if (typeof ack === 'function') {
+            ack({ ok: true, channel: socket.data.channel });
+          }
+        } catch (err) {
+          if (typeof ack === 'function') {
+            ack({ ok: false, error: 'server-error' });
+          }
+        }
+      });
 
       socket.on('send-message', async ({ text }, ack) => {
         try {
           const username = socket.data.username;
+          const channel = socket.data.channel || chats.DEFAULT_CHANNEL_ID;
 
           if (!username || !chats.isValidMessageText(text)) {
             socket.emit('chat-error', { error: 'required-message' });
@@ -230,11 +277,12 @@ function createApp({
           }
 
           await chats.addMessage({
+            channel,
             sender: username,
             text: text.trim(),
           });
 
-          await broadcastMessages(io);
+          await broadcastMessages(io, channel);
 
           if (typeof ack === 'function') {
             ack({ ok: true });
@@ -248,7 +296,9 @@ function createApp({
       });
 
       socket.on('disconnect', async () => {
-        await broadcastUsers(io);
+        if (socket.data.channel) {
+          await broadcastUsers(io, socket.data.channel);
+        }
       });
     });
 

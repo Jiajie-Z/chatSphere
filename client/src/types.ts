@@ -20,6 +20,7 @@ export type ApiError = {
 
 export type Message = {
   id: number;
+  channel: string;
   sender: string;
   text: string;
   created_at?: string;
@@ -33,6 +34,15 @@ export type PendingMessage = {
 };
 
 export type UserMap = Record<string, string>;
+
+export type Channel = {
+  id: string;
+  name: string;
+};
+
+export type ChannelsResponse = {
+  channels: Channel[];
+};
 
 export type SessionResponse = {
   username: string;
@@ -48,11 +58,13 @@ export type LogoutResponse = {
 
 export type MessagesResponse = {
   username: string;
+  channel: string;
   messagesList: Message[];
   hasMore: boolean;
 };
 
 export type UsersResponse = {
   username: string;
+  channel: string;
   usersList: UserMap;
 };

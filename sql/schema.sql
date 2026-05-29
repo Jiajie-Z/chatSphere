@@ -14,8 +14,10 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 CREATE TABLE IF NOT EXISTS messages (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  channel VARCHAR(32) NOT NULL DEFAULT 'general',
   sender VARCHAR(20) NOT NULL,
   text TEXT NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (sender) REFERENCES users(username) ON DELETE CASCADE
+  FOREIGN KEY (sender) REFERENCES users(username) ON DELETE CASCADE,
+  INDEX idx_messages_channel_id (channel, id)
 );

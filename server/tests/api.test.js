@@ -45,6 +45,7 @@ function createTestServices(options = {}) {
         messagesList: [
           {
             id: 42,
+            channel: query.channel || 'general',
             sender: 'jiajie',
             text: 'hello',
             created_at: '2026-05-28T00:00:00.000Z',
@@ -105,13 +106,30 @@ test('passes message pagination query parameters to the data layer', async () =>
   sessionsById.set('sid-123', 'jiajie');
 
   const response = await request(app)
-    .get('/api/messages?before=42&limit=25')
+    .get('/api/messages?channel=engineering&before=42&limit=25')
     .set('Cookie', ['sid=sid-123']);
 
   assert.equal(response.status, 200);
-  assert.deepEqual(calls.messageQueries, [{ before: '42', limit: '25' }]);
+  assert.deepEqual(calls.messageQueries, [{ before: '42', channel: 'engineering', limit: '25' }]);
+  assert.equal(response.body.channel, 'engineering');
   assert.equal(response.body.hasMore, true);
   assert.equal(response.body.messagesList[0].id, 42);
+});
+
+test('returns the available chat channels', async () => {
+  const { app, sessionsById } = createTestServices();
+  sessionsById.set('sid-123', 'jiajie');
+
+  const response = await request(app)
+    .get('/api/channels')
+    .set('Cookie', ['sid=sid-123']);
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(response.body.channels.map((channel) => channel.id), [
+    'general',
+    'engineering',
+    'random',
+  ]);
 });
 
 test('clears and deletes an existing session on logout', async () => {

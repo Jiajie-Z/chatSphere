@@ -2,8 +2,16 @@ const { getPool } = require('./db');
 const bcrypt = require('bcrypt');
 
 const DEFAULT_MESSAGE_LIMIT = 50;
+const DEFAULT_CHANNEL_ID = 'general';
 const MAX_MESSAGE_LIMIT = 100;
 const MAX_MESSAGE_LENGTH = 500;
+const CHANNELS = [
+  { id: 'general', name: 'General' },
+  { id: 'engineering', name: 'Engineering' },
+  { id: 'random', name: 'Random' },
+];
+
+let messageSchemaReady = false;
 
 function isValidUsername(username) {
   if (!username || typeof username !== 'string') {
@@ -29,6 +37,52 @@ function isValidMessageText(text) {
     && typeof text === 'string'
     && text.trim().length > 0
     && text.trim().length <= MAX_MESSAGE_LENGTH;
+}
+
+function isValidChannel(channel) {
+  return CHANNELS.some((item) => item.id === channel);
+}
+
+function normalizeChannel(channel) {
+  return isValidChannel(channel) ? channel : DEFAULT_CHANNEL_ID;
+}
+
+async function ensureMessageSchema() {
+  if (messageSchemaReady) {
+    return;
+  }
+
+  const pool = await getPool();
+  const [columns] = await pool.execute(
+    `SELECT COLUMN_NAME
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'messages'
+       AND COLUMN_NAME = 'channel'`
+  );
+
+  if (!columns.length) {
+    await pool.execute(
+      `ALTER TABLE messages
+       ADD COLUMN channel VARCHAR(32) NOT NULL DEFAULT 'general' AFTER id`
+    );
+  }
+
+  const [indexes] = await pool.execute(
+    `SELECT INDEX_NAME
+     FROM INFORMATION_SCHEMA.STATISTICS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'messages'
+       AND INDEX_NAME = 'idx_messages_channel_id'`
+  );
+
+  if (!indexes.length) {
+    await pool.execute(
+      'CREATE INDEX idx_messages_channel_id ON messages (channel, id)'
+    );
+  }
+
+  messageSchemaReady = true;
 }
 
 function normalizeMessageLimit(limit) {
@@ -88,28 +142,33 @@ async function verifyLogin(username, password) {
   return { ok: true };
 }
 
-async function addMessage({ sender, text }) {
+async function addMessage({ channel = DEFAULT_CHANNEL_ID, sender, text }) {
+  await ensureMessageSchema();
   const pool = await getPool();
+  const normalizedChannel = normalizeChannel(channel);
 
   await pool.execute(
-    'INSERT INTO messages (sender, text) VALUES (?, ?)',
-    [sender, text]
+    'INSERT INTO messages (channel, sender, text) VALUES (?, ?, ?)',
+    [normalizedChannel, sender, text]
   );
 }
 
-async function getMessages({ before, limit } = {}) {
+async function getMessages({ before, channel, limit } = {}) {
+  await ensureMessageSchema();
   const pool = await getPool();
+  const normalizedChannel = normalizeChannel(channel);
   const messageLimit = normalizeMessageLimit(limit);
   const beforeId = normalizeMessageCursor(before);
 
   const queryLimit = messageLimit + 1;
-  const params = beforeId ? [beforeId] : [];
-  const whereClause = beforeId ? 'WHERE id < ?' : '';
+  const params = beforeId ? [normalizedChannel, beforeId] : [normalizedChannel];
+  const cursorClause = beforeId ? 'AND id < ?' : '';
 
   const [rows] = await pool.execute(
-    `SELECT id, sender, text, created_at
+    `SELECT id, channel, sender, text, created_at
      FROM messages
-     ${whereClause}
+     WHERE channel = ?
+     ${cursorClause}
      ORDER BY id DESC
      LIMIT ${queryLimit}`,
     params
@@ -125,10 +184,15 @@ async function getMessages({ before, limit } = {}) {
 }
 
 module.exports = {
+  CHANNELS,
+  DEFAULT_CHANNEL_ID,
   MAX_MESSAGE_LENGTH,
+  ensureMessageSchema,
+  isValidChannel,
   isValidUsername,
   isValidPassword,
   isValidMessageText,
+  normalizeChannel,
   getUserByUsername,
   createUser,
   verifyLogin,

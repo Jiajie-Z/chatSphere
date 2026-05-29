@@ -38,7 +38,9 @@ export default function MessageInput({ isSending, onSendMessage }: MessageInputP
         value={text}
         onChange={(e) => setText(e.target.value)}
       />
-      <span className="message-count">{trimmedLength}/{MAX_MESSAGE_LENGTH}</span>
+      <div className="composer-meta">
+        <span className="message-count">{trimmedLength}/{MAX_MESSAGE_LENGTH}</span>
+      </div>
       <button className="send__button" type="submit" disabled={!canSend || isSending}>
         {isSending ? 'Sending...' : 'Send'}
       </button>

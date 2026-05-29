@@ -28,9 +28,12 @@ export default function AuthForm({ mode, error, onLogin, onRegister, onSwitchMod
   return (
     <div id="login">
       <div className="auth-header">
-        <p className="app-name">ChatSphere</p>
+        <div className="brand-lockup">
+          <span className="brand-mark" aria-hidden="true">CS</span>
+          <p className="app-name">ChatSphere</p>
+        </div>
         <h1>{mode === 'login' ? 'Welcome back' : 'Create your account'}</h1>
-        <p className="auth-subtitle">Real-time conversations with persistent history.</p>
+        <p className="auth-subtitle">{mode === 'login' ? 'Sign in to continue.' : 'Choose your credentials.'}</p>
       </div>
 
       {error ? <p className="form-error">{error}</p> : null}
@@ -71,7 +74,7 @@ export default function AuthForm({ mode, error, onLogin, onRegister, onSwitchMod
                 type="button"
                 onClick={() => onSwitchMode('register')}
               >
-                Go to Register
+                Create account
               </button>
             </>
           ) : (

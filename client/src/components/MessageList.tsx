@@ -49,6 +49,9 @@ export default function MessageList({
 
       {messages.map((message, index) => {
         const isSelf = message.sender === currentUser;
+        const messageTime = message.created_at
+          ? new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          : '';
 
         return (
           <li
@@ -56,8 +59,11 @@ export default function MessageList({
             key={`${message.sender}-${message.created_at || index}`}
           >
             <div className={`message ${isSelf ? 'message--self' : ''}`}>
-              <span className="message__sender">
-                {isSelf ? 'You' : message.sender}
+              <span className="message__meta">
+                <span className="message__sender">
+                  {isSelf ? 'You' : message.sender}
+                </span>
+                {messageTime ? <span className="message__time">{messageTime}</span> : null}
               </span>
               <span className="message__text">{message.text}</span>
             </div>
@@ -70,7 +76,10 @@ export default function MessageList({
           key={message.clientId}
         >
           <div className={`message message--self message--${message.status}`}>
-            <span className="message__sender">You</span>
+            <span className="message__meta">
+              <span className="message__sender">You</span>
+              <span className="message__time">now</span>
+            </span>
             <span className="message__text">{message.text}</span>
             <span className="message__status">
               {message.status === 'sending' ? 'Sending...' : 'Failed'}

@@ -1,4 +1,4 @@
-import type { MessagesResponse, UsersResponse } from '../types';
+import type { ChannelsResponse, MessagesResponse, UsersResponse } from '../types';
 
 async function parseJsonResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
@@ -14,11 +14,22 @@ function rejectNetworkError(): Promise<never> {
 
 type FetchMessagesOptions = {
   before?: number;
+  channel?: string;
   limit?: number;
 };
 
+export function fetchChannels(): Promise<ChannelsResponse> {
+  return fetch('/api/channels')
+    .catch(rejectNetworkError)
+    .then((response) => parseJsonResponse<ChannelsResponse>(response));
+}
+
 export function fetchMessages(options: FetchMessagesOptions = {}): Promise<MessagesResponse> {
   const params = new URLSearchParams();
+
+  if (options.channel) {
+    params.set('channel', options.channel);
+  }
 
   if (options.before) {
     params.set('before', String(options.before));
@@ -36,8 +47,17 @@ export function fetchMessages(options: FetchMessagesOptions = {}): Promise<Messa
     .then((response) => parseJsonResponse<MessagesResponse>(response));
 }
 
-export function fetchUsers(): Promise<UsersResponse> {
-  return fetch('/api/users')
+export function fetchUsers(channel?: string): Promise<UsersResponse> {
+  const params = new URLSearchParams();
+
+  if (channel) {
+    params.set('channel', channel);
+  }
+
+  const queryString = params.toString();
+  const url = queryString ? `/api/users?${queryString}` : '/api/users';
+
+  return fetch(url)
     .catch(rejectNetworkError)
     .then((response) => parseJsonResponse<UsersResponse>(response));
 }

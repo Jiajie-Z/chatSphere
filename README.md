@@ -8,7 +8,7 @@
 ![Docker](https://img.shields.io/badge/DevOps-Docker-blue)
 ![CI](https://img.shields.io/badge/CI-GitHub%20Actions-black)
 
-ChatSphere is a production-minded full-stack realtime chat application. It combines a typed React frontend, an Express + Socket.IO backend, MySQL persistence, Redis-backed realtime scaling, secure session authentication, and Dockerized delivery.
+ChatSphere is a production-minded full-stack realtime chat application. It combines a typed React frontend, multi-channel chat, an Express + Socket.IO backend, MySQL persistence, Redis-backed realtime scaling, secure session authentication, and Dockerized delivery.
 
 ## Why This Project
 
@@ -17,6 +17,7 @@ I built ChatSphere to go beyond a basic chat demo and practice the engineering c
 The current version is designed to run as a multi-service Docker application:
 
 - React + TypeScript frontend served as static production assets through Nginx
+- Channel-based chat UI with isolated message history and online-user lists
 - Express REST API and Socket.IO backend
 - MySQL for users, sessions, and messages
 - Redis for Socket.IO cross-instance broadcasts and online-user discovery
@@ -40,6 +41,7 @@ ChatSphere uses REST endpoints for authentication, session checks, paginated mes
 - **Typed frontend:** React components and API clients are written in TypeScript with shared response/error types.
 - **Secure auth:** Passwords are hashed with bcrypt; sessions use HttpOnly, SameSite, Max-Age, and production Secure cookie settings.
 - **Authenticated sockets:** Socket.IO identity comes from the session cookie, not a client-provided username.
+- **Channels:** `General`, `Engineering`, and `Random` channels isolate message history and online-user presence.
 - **Reliable sends:** Message sends use Socket.IO acknowledgements so the UI can show sending, failed, and retry states.
 - **Scalable realtime:** Redis adapter enables cross-instance Socket.IO broadcasts and online-user discovery.
 - **Bounded history:** Message history is paginated with an `id < before` cursor instead of loading full chat history.
@@ -62,16 +64,18 @@ ChatSphere uses REST endpoints for authentication, session checks, paginated mes
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
 | `GET` | `/api/session` | Check whether the current browser has a valid session |
+| `GET` | `/api/channels` | Load available chat channels |
 | `POST` | `/api/auth/register` | Create a user, hash the password, and start a session |
 | `POST` | `/api/auth/login` | Verify credentials and start a session |
 | `DELETE` | `/api/session` | Clear the session cookie and delete the stored session |
-| `GET` | `/api/messages?before=<id>&limit=50` | Load a bounded page of persisted chat messages |
-| `GET` | `/api/users` | Load currently connected chat users |
+| `GET` | `/api/messages?channel=<id>&before=<id>&limit=50` | Load a bounded page of channel messages |
+| `GET` | `/api/users?channel=<id>` | Load users currently connected to a channel |
 
 ## Realtime Events
 
 | Event | Direction | Purpose |
 |-------|-----------|---------|
+| `join-channel` | Client to server | Move the socket into a channel room |
 | `send-message` | Client to server | Persist a message and return an acknowledgement |
 | `messages-updated` | Server to clients | Broadcast the latest message page |
 | `users-updated` | Server to clients | Broadcast the active user list |
@@ -82,7 +86,8 @@ ChatSphere uses REST endpoints for authentication, session checks, paginated mes
 The app is currently suitable for single-node deployment and has a clear path to multi-instance realtime scaling:
 
 - Redis adapter lets Socket.IO broadcasts fan out across backend instances.
-- `io.fetchSockets()` is used for online-user discovery, so the online list can span Redis-connected Socket.IO nodes.
+- Socket.IO rooms isolate channel broadcasts and channel-specific online-user discovery.
+- `io.in(channelRoom).fetchSockets()` is used for online-user discovery, so channel presence can span Redis-connected Socket.IO nodes.
 - MySQL stores durable users, sessions, and messages.
 - Message pagination avoids repeatedly loading unbounded history.
 
@@ -101,7 +106,7 @@ Future production work would include a Redis-backed session store, Redis-backed 
 
 - Sessions are still stored in MySQL. This keeps the project simple, but Redis would be a better fit for high-volume session reads.
 - Rate limiting is currently in memory. For multiple backend instances, it should move to Redis.
-- The app has one global chat stream. A production chat product would add rooms, room membership, authorization, and room-specific message indexes.
+- Channels are currently fixed in code. A production chat product would add user-created rooms, room membership, and per-room authorization.
 - `messages-updated` broadcasts the latest page after sends. A more efficient large-scale design would broadcast only `message-created` events and let clients append incrementally.
 
 ## Run With Docker

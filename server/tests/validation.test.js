@@ -37,6 +37,14 @@ test('validates message text length', () => {
   assert.equal(chats.isValidMessageText(null), false);
 });
 
+test('validates and normalizes channels', () => {
+  assert.equal(chats.isValidChannel('general'), true);
+  assert.equal(chats.isValidChannel('engineering'), true);
+  assert.equal(chats.isValidChannel('missing'), false);
+  assert.equal(chats.normalizeChannel('random'), 'random');
+  assert.equal(chats.normalizeChannel('missing'), chats.DEFAULT_CHANNEL_ID);
+});
+
 test('reads a named cookie from a socket handshake header', () => {
   const header = 'theme=dark; sid=session-123%20abc; other=value';
 
