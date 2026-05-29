@@ -4,18 +4,23 @@
   "description": "Express and Socket.IO backend for the ChatSphere real-time chat application.",
   "main": "server/index.js",
   "scripts": {
-    "test": "node --check server/index.js && node --check server/chats.js && node --check server/sessions.js && node --check server/db.js && node --test server/tests/*.test.js",
+    "test": "node --check server/index.js && node --check server/auth.js && node --check server/rateLimit.js && node --check server/socketCluster.js && node --check server/chats.js && node --check server/sessions.js && node --check server/db.js && node --test server/tests/*.test.js",
     "start": "node server/index.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@socket.io/redis-adapter": "^8.3.0",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.6",
     "dotenv": "^17.4.1",
     "express": "^4.18.3",
     "mysql2": "^3.20.0",
+    "redis": "^6.0.0",
     "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "supertest": "^7.2.2"
   }
 }

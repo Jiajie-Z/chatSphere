@@ -1,6 +1,10 @@
 const { getPool } = require('./db');
 const bcrypt = require('bcrypt');
 
+const DEFAULT_MESSAGE_LIMIT = 50;
+const MAX_MESSAGE_LIMIT = 100;
+const MAX_MESSAGE_LENGTH = 500;
+
 function isValidUsername(username) {
   if (!username || typeof username !== 'string') {
     return false;
@@ -18,6 +22,33 @@ function isValidPassword(password) {
     && typeof password === 'string'
     && password.length >= 6
     && password.length <= 100;
+}
+
+function isValidMessageText(text) {
+  return !!text
+    && typeof text === 'string'
+    && text.trim().length > 0
+    && text.trim().length <= MAX_MESSAGE_LENGTH;
+}
+
+function normalizeMessageLimit(limit) {
+  const parsedLimit = Number.parseInt(limit, 10);
+
+  if (Number.isNaN(parsedLimit) || parsedLimit <= 0) {
+    return DEFAULT_MESSAGE_LIMIT;
+  }
+
+  return Math.min(parsedLimit, MAX_MESSAGE_LIMIT);
+}
+
+function normalizeMessageCursor(before) {
+  const parsedBefore = Number.parseInt(before, 10);
+
+  if (Number.isNaN(parsedBefore) || parsedBefore <= 0) {
+    return null;
+  }
+
+  return parsedBefore;
 }
 
 async function getUserByUsername(username) {
@@ -66,19 +97,38 @@ async function addMessage({ sender, text }) {
   );
 }
 
-async function getMessages() {
+async function getMessages({ before, limit } = {}) {
   const pool = await getPool();
+  const messageLimit = normalizeMessageLimit(limit);
+  const beforeId = normalizeMessageCursor(before);
+
+  const queryLimit = messageLimit + 1;
+  const params = beforeId ? [beforeId] : [];
+  const whereClause = beforeId ? 'WHERE id < ?' : '';
 
   const [rows] = await pool.execute(
-    'SELECT sender, text, created_at FROM messages ORDER BY id ASC'
+    `SELECT id, sender, text, created_at
+     FROM messages
+     ${whereClause}
+     ORDER BY id DESC
+     LIMIT ${queryLimit}`,
+    params
   );
 
-  return rows;
+  const hasMore = rows.length > messageLimit;
+  const messagesList = rows.slice(0, messageLimit).reverse();
+
+  return {
+    hasMore,
+    messagesList,
+  };
 }
 
 module.exports = {
+  MAX_MESSAGE_LENGTH,
   isValidUsername,
   isValidPassword,
+  isValidMessageText,
   getUserByUsername,
   createUser,
   verifyLogin,

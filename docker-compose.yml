@@ -17,6 +17,18 @@ services:
       timeout: 5s
       retries: 20
 
+  redis:
+    image: redis:7-alpine
+    container_name: chat-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   server:
     build:
       context: .
@@ -26,6 +38,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       PORT: 3000
       DB_HOST: db
@@ -33,6 +47,7 @@ services:
       DB_USER: root
       DB_PASSWORD: rootpassword
       DB_NAME: chat_app
+      REDIS_URL: redis://redis:6379
     ports:
       - "3000:3000"
 
@@ -44,10 +59,8 @@ services:
     restart: always
     depends_on:
       - server
-    environment:
-      VITE_API_PROXY_TARGET: http://server:3000
     ports:
-      - "5173:5173"
+      - "5173:80"
 
 volumes:
   mysql_data:

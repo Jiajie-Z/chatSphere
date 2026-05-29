@@ -1,75 +1,61 @@
 # ChatSphere
 
 ![React](https://img.shields.io/badge/Frontend-React-blue)
+![TypeScript](https://img.shields.io/badge/Frontend-TypeScript-blue)
 ![Node](https://img.shields.io/badge/Backend-Node.js-green)
 ![MySQL](https://img.shields.io/badge/Database-MySQL-orange)
+![Redis](https://img.shields.io/badge/Realtime-Redis-red)
 ![Docker](https://img.shields.io/badge/DevOps-Docker-blue)
 ![CI](https://img.shields.io/badge/CI-GitHub%20Actions-black)
 
-A full-stack real-time chat application with persistent storage and real-time messaging.
+ChatSphere is a production-minded full-stack realtime chat application. It combines a typed React frontend, an Express + Socket.IO backend, MySQL persistence, Redis-backed realtime scaling, secure session authentication, and Dockerized delivery.
 
-## Overview
+## Why This Project
 
-ChatSphere is a real-time chat system that supports:
+I built ChatSphere to go beyond a basic chat demo and practice the engineering concerns that show up in production systems: authenticated realtime connections, persistent state, bounded history loading, failure-aware message sending, API tests, containerized services, and horizontal scaling paths.
 
-- User authentication
-- Persistent data storage (MySQL)
-- Live chat updates (Socket.IO)
-- Online user tracking
-- Containerized development environment (Docker)
+The current version is designed to run as a multi-service Docker application:
 
----
-
-## Tech Stack
-
-### Frontend
-- React
-- Vite
-- CSS
-- Socket.IO Client
-
-### Backend
-- Node.js
-- Express
-- Socket.IO
-- bcrypt
-- cookie-parser
-
-### Database
-- MySQL 8
-
-### DevOps / Tooling
-- Docker
-- Docker Compose
-- GitHub Actions
-
----
-
-## Features
-
-- User registration and login
-- Password hashing with bcrypt
-- Session-based authentication
-- Persistent users, sessions, and messages in MySQL
-- Real-time messaging with Socket.IO
-- Live online user list
-- Dockerized multi-service setup
-- React frontend with Vite proxy
-- Express REST API backend
-
----
+- React + TypeScript frontend served as static production assets through Nginx
+- Express REST API and Socket.IO backend
+- MySQL for users, sessions, and messages
+- Redis for Socket.IO cross-instance broadcasts and online-user discovery
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-  Browser["React client"] -->|"REST API"| Server["Express server"]
-  Browser <-->|"Socket.IO"| Server
-  Server -->|"mysql2 connection pool"| Database["MySQL"]
+  Browser["React + TypeScript client"] -->|"REST API"| Nginx["Nginx static server"]
+  Browser <-->|"Socket.IO"| Nginx
+  Nginx -->|"proxy /api + /socket.io"| Server["Express + Socket.IO server"]
+  Server -->|"mysql2 pool"| MySQL["MySQL"]
+  Server <-->|"Socket.IO Redis adapter"| Redis["Redis"]
   Server -->|"bcrypt"| Auth["Password hashing"]
 ```
 
-ChatSphere uses REST endpoints for authentication, session checks, initial message loading, and user loading. Socket.IO handles live chat events after a user has joined the chat. Messages are persisted in MySQL, while the online user list is derived from active socket connections.
+ChatSphere uses REST endpoints for authentication, session checks, paginated message loading, and user loading. Socket.IO connections are authenticated against the same server-side session cookie before realtime events are accepted. Messages are persisted in MySQL. Redis backs the Socket.IO adapter so broadcasts and online-user discovery can work across multiple server instances.
+
+## Engineering Highlights
+
+- **Typed frontend:** React components and API clients are written in TypeScript with shared response/error types.
+- **Secure auth:** Passwords are hashed with bcrypt; sessions use HttpOnly, SameSite, Max-Age, and production Secure cookie settings.
+- **Authenticated sockets:** Socket.IO identity comes from the session cookie, not a client-provided username.
+- **Reliable sends:** Message sends use Socket.IO acknowledgements so the UI can show sending, failed, and retry states.
+- **Scalable realtime:** Redis adapter enables cross-instance Socket.IO broadcasts and online-user discovery.
+- **Bounded history:** Message history is paginated with an `id < before` cursor instead of loading full chat history.
+- **Abuse protection:** Login and registration routes are rate limited.
+- **Test coverage:** Backend tests cover validation helpers, protected routes, session behavior, registration cookies, pagination query handling, and rate limiting.
+- **Production container:** The frontend is built once and served from Nginx, with `/api` and `/socket.io` proxied to the backend.
+
+## Tech Stack
+
+| Area | Tools |
+|------|-------|
+| Frontend | React, TypeScript, Vite, Socket.IO Client |
+| Backend | Node.js, Express, Socket.IO, bcrypt, cookie-parser |
+| Data | MySQL 8, Redis 7 |
+| Delivery | Docker, Docker Compose, Nginx |
+| Testing | Node test runner, Supertest, ESLint, TypeScript |
 
 ## API Overview
 
@@ -79,122 +65,76 @@ ChatSphere uses REST endpoints for authentication, session checks, initial messa
 | `POST` | `/api/auth/register` | Create a user, hash the password, and start a session |
 | `POST` | `/api/auth/login` | Verify credentials and start a session |
 | `DELETE` | `/api/session` | Clear the session cookie and delete the stored session |
-| `GET` | `/api/messages` | Load persisted chat messages for an authenticated user |
+| `GET` | `/api/messages?before=<id>&limit=50` | Load a bounded page of persisted chat messages |
 | `GET` | `/api/users` | Load currently connected chat users |
 
-## Real-Time Events
+## Realtime Events
 
 | Event | Direction | Purpose |
 |-------|-----------|---------|
-| `join-chat` | Client to server | Associate a socket connection with the logged-in user |
-| `send-message` | Client to server | Persist a message from the connected user |
-| `messages-updated` | Server to clients | Broadcast the latest message list |
+| `send-message` | Client to server | Persist a message and return an acknowledgement |
+| `messages-updated` | Server to clients | Broadcast the latest message page |
 | `users-updated` | Server to clients | Broadcast the active user list |
 | `chat-error` | Server to client | Report message or server errors |
 
----
+## Scaling Considerations
 
-## Project Structure
+The app is currently suitable for single-node deployment and has a clear path to multi-instance realtime scaling:
 
-```bash
-chatSphere/
-├── client/                  # React + Vite frontend
-│   ├── src/
-│   │   ├── api/
-│   │   ├── components/
-│   │   ├── App.jsx
-│   │   ├── main.jsx
-│   │   └── styles.css
-│   ├── Dockerfile
-│   ├── package.json
-│   └── vite.config.js
-├── sql/
-│   └── schema.sql           # MySQL schema
-├── server/                  # Express + Socket.IO backend
-│   ├── index.js             # API routes, socket events, and server startup
-│   ├── chats.js             # chat/user DB logic
-│   ├── db.js                # MySQL connection with retry
-│   ├── sessions.js          # session DB logic
-│   └── tests/
-│       └── validation.test.js
-├── .github/
-│   └── workflows/
-│       └── ci.yml           # GitHub Actions CI workflow
-├── Dockerfile               # backend Dockerfile
-├── docker-compose.yml
-├── package.json             # backend dependencies
-└── README.md
-```
+- Redis adapter lets Socket.IO broadcasts fan out across backend instances.
+- `io.fetchSockets()` is used for online-user discovery, so the online list can span Redis-connected Socket.IO nodes.
+- MySQL stores durable users, sessions, and messages.
+- Message pagination avoids repeatedly loading unbounded history.
 
-# How to Run ChatSphere
+Future production work would include a Redis-backed session store, Redis-backed rate limiting, room-based message partitioning with `(room_id, id)` indexes, and a load balancer configured for websocket traffic.
 
-This guide explains how to run the ChatSphere application using either Docker (recommended) or local development setup.
+## Security Decisions
 
----
+- Passwords are never stored directly; bcrypt hashes are persisted.
+- Session cookies are HttpOnly to reduce client-side script exposure.
+- SameSite=Lax is used to reduce cross-site request risk while keeping normal navigation usable.
+- Secure cookies are enabled for production-mode configuration.
+- Authenticated websocket identity is resolved server-side from the session cookie.
+- Login and registration are rate limited to reduce brute-force attempts.
 
-## Option 1: Run with Docker (Recommended)
+## Tradeoffs
 
-### Prerequisites
+- Sessions are still stored in MySQL. This keeps the project simple, but Redis would be a better fit for high-volume session reads.
+- Rate limiting is currently in memory. For multiple backend instances, it should move to Redis.
+- The app has one global chat stream. A production chat product would add rooms, room membership, authorization, and room-specific message indexes.
+- `messages-updated` broadcasts the latest page after sends. A more efficient large-scale design would broadcast only `message-created` events and let clients append incrementally.
+
+## Run With Docker
+
+Prerequisites:
 
 - Docker Desktop installed
-- Docker Desktop is running
+- Docker Desktop running
 
----
-
-### 1. Start the application
-
-From the project root directory:
+Start the application:
 
 ```bash
 docker compose up --build
 ```
 
----
+Access:
 
-### 2. Access the application
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:5173 |
+| Backend | http://localhost:3000 |
+| MySQL | localhost:3307 |
+| Redis | localhost:6379 |
 
-| Service   | URL                          |
-|----------|------------------------------|
-| Frontend | http://localhost:5173        |
-| Backend  | http://localhost:3000        |
-
----
-
-### 3. Stop the application
+Stop the application:
 
 ```bash
 docker compose down
 ```
 
----
+## Local Development
 
-
-
-## Option 2: Run Locally (Without Docker)
-
----
-
-### 1. Start MySQL
-
-Make sure MySQL is installed and running.
-
-Create database:
-
-```sql
-CREATE DATABASE chat_app;
-```
-
-Run schema:
-
-```bash
-mysql -u root -p chat_app < sql/schema.sql
-```
-
----
-
-### 2. Create `.env` file
-
-In the project root:
+Start MySQL and Redis locally, then create a root `.env`:
 
 ```env
 PORT=3000
@@ -203,20 +143,27 @@ DB_PORT=3306
 DB_USER=root
 DB_PASSWORD=your_password
 DB_NAME=chat_app
+REDIS_URL=redis://localhost:6379
 ```
 
----
+Create the database and run the schema:
 
-### 3. Start backend
+```sql
+CREATE DATABASE chat_app;
+```
+
+```bash
+mysql -u root -p chat_app < sql/schema.sql
+```
+
+Start the backend:
 
 ```bash
 npm install
 npm start
 ```
 
----
-
-### 4. Start frontend
+Start the frontend dev server:
 
 ```bash
 cd client
@@ -224,56 +171,52 @@ npm install
 npm run dev
 ```
 
----
+## Testing
 
-### 5. Access application
+Backend:
 
-| Service   | URL                   |
-|----------|------------------------|
-| Frontend | http://localhost:5173 |
-
-
----
-
-## Common Issues
-
----
-
-### 1. MySQL not ready (Docker)
-
-If backend logs show connection errors:
-
-```text
-ECONNREFUSED
+```bash
+npm test
 ```
 
-This usually means MySQL is still starting.
+Frontend:
 
-Solution:
-- Wait a few seconds
-- Or restart containers
+```bash
+cd client
+npm run lint
+npm run typecheck
+npm run build
+```
 
----
+## Project Structure
 
----
-
-
-### 2. Port already in use
-
-If you see port conflicts:
-
-- Change ports in `docker-compose.yml`
-- Or stop existing services using that port
-
----
-
-## Notes
-
-- Docker uses service names for networking (`DB_HOST=db`)
-- The Vite proxy targets `http://localhost:3000` by default for local development
-- Docker overrides the Vite proxy with `VITE_API_PROXY_TARGET=http://server:3000`
-- `.env` is used only in local mode
-- Docker uses `environment` in compose instead
-
----
-
+```bash
+chatSphere/
+├── client/
+│   ├── src/
+│   │   ├── api/
+│   │   ├── components/
+│   │   ├── App.tsx
+│   │   ├── main.tsx
+│   │   ├── styles.css
+│   │   └── types.ts
+│   ├── Dockerfile
+│   ├── nginx.conf
+│   ├── package.json
+│   └── vite.config.js
+├── sql/
+│   └── schema.sql
+├── server/
+│   ├── auth.js
+│   ├── chats.js
+│   ├── db.js
+│   ├── index.js
+│   ├── rateLimit.js
+│   ├── sessions.js
+│   ├── socketCluster.js
+│   └── tests/
+├── Dockerfile
+├── docker-compose.yml
+├── package.json
+└── README.md
+```

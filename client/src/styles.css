@@ -138,7 +138,8 @@ button {
 
 .login-form__actions button,
 .send__button,
-.logout__button {
+.logout__button,
+.load-older__button {
   height: 42px;
   border-radius: 8px;
   cursor: pointer;
@@ -148,7 +149,8 @@ button {
 
 .login-form__actions button:hover,
 .send__button:hover,
-.logout__button:hover {
+.logout__button:hover,
+.load-older__button:hover {
   transform: translateY(-1px);
 }
 
@@ -167,14 +169,16 @@ button {
 
 .go-to-register__button,
 .back-to-login__button,
-.logout__button {
+.logout__button,
+.load-older__button {
   background: #eef6f6;
   color: #0f766e;
 }
 
 .go-to-register__button:hover,
 .back-to-login__button:hover,
-.logout__button:hover {
+.logout__button:hover,
+.load-older__button:hover {
   background: #dff0ef;
 }
 
@@ -301,6 +305,23 @@ button {
   min-height: 100%;
 }
 
+.messages__pagination {
+  display: flex;
+  justify-content: center;
+}
+
+.load-older__button {
+  height: 36px;
+  padding: 0 14px;
+  font-size: 0.86rem;
+}
+
+.load-older__button:disabled {
+  cursor: wait;
+  opacity: 0.64;
+  transform: none;
+}
+
 .message-row {
   display: flex;
   justify-content: flex-start;
@@ -326,6 +347,15 @@ button {
   background: #ccfbf1;
 }
 
+.message--sending {
+  opacity: 0.72;
+}
+
+.message--failed {
+  border-color: #fecaca;
+  background: #fff1f2;
+}
+
 .message__sender {
   color: #0f766e;
   font-size: 0.78rem;
@@ -336,6 +366,34 @@ button {
   color: #172033;
   overflow-wrap: anywhere;
   line-height: 1.45;
+}
+
+.message__status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #64748b;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.message--failed .message__status {
+  color: #be123c;
+}
+
+.message__retry {
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 8px;
+  background: #ffe4e6;
+  color: #be123c;
+  cursor: pointer;
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.message__retry:hover {
+  background: #fecdd3;
 }
 
 .messages__bottom {
@@ -349,8 +407,9 @@ button {
 }
 
 .outgoing-form {
+  align-items: center;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 96px;
+  grid-template-columns: minmax(0, 1fr) auto 96px;
   gap: 10px;
 }
 
@@ -363,6 +422,14 @@ button {
   cursor: not-allowed;
   opacity: 0.48;
   transform: none;
+}
+
+.message-count {
+  min-width: 58px;
+  color: #64748b;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
 .loading-indicator {
@@ -436,5 +503,9 @@ button {
   .login-form__actions,
   .outgoing-form {
     grid-template-columns: 1fr;
+  }
+
+  .message-count {
+    text-align: left;
   }
 }

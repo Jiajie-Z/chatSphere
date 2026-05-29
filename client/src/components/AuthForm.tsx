@@ -1,10 +1,19 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
+import type { AuthMode } from '../types';
 
-export default function AuthForm({ mode, error, onLogin, onRegister, onSwitchMode }) {
+type AuthFormProps = {
+  mode: AuthMode;
+  error: string;
+  onLogin: (username: string, password: string) => void;
+  onRegister: (username: string, password: string) => void;
+  onSwitchMode: (mode: AuthMode) => void;
+};
+
+export default function AuthForm({ mode, error, onLogin, onRegister, onSwitchMode }: AuthFormProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
-  function handleSubmit(e) {
+  function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
     const trimmedUsername = username.trim();

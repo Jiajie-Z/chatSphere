@@ -1,4 +1,11 @@
-export default function UserList({ users, currentUser }) {
+import type { UserMap } from '../types';
+
+type UserListProps = {
+  users: UserMap;
+  currentUser: string;
+};
+
+export default function UserList({ users, currentUser }: UserListProps) {
   const onlineUsers = Object.values(users);
 
   return (
